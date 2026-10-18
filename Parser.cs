@@ -15,28 +15,8 @@ class Parser
     {
         List<Stmt> stmts = new List<Stmt>();
 
-        while (Check(TokenType.Use))
-        {
-            var uses = ParseUse();
-            foreach (UseStmt useStmt in uses)
-                stmts.Add(useStmt);
-        }
-
-        while (Check(TokenType.Import))
-        {
-            var imports = ParseImport();
-            foreach (ImportStmt importStmt in imports)
-                stmts.Add(importStmt);
-        }
-
         while (NotAtEnd())
         {
-            if (Check(TokenType.Use))
-                throw new Error("'use' must appear before all other statements", Current().Position);
-
-            if (Check(TokenType.Import))
-                throw new Error("'import' must appear before all other statements besides 'use'", Current().Position);
-
             stmts.Add(ParseStmt());
         }
 
@@ -45,260 +25,7 @@ class Parser
 
     Stmt ParseStmt()
     {
-        if (Check(TokenType.Identifier))
-            return ParseIdentifier();
-
-        else if (Check(TokenType.If))
-            return ParseIf();
-
-        else if (Check(TokenType.While))
-            return ParseWhile();
-
-        else if (Check(TokenType.Break))
-            return ParseBreak();
-
-        else if (Check(TokenType.Continue))
-            return ParseContinue();
-
-        else if (Check(TokenType.Return))
-            return ParseReturn();
-
-        else if (Check(TokenType.For))
-            return ParseFor();
-
         throw ThrowUnexpected();
-    }
-
-    Stmt ParseIdentifier()
-    {
-        Position position = Current().Position;
-
-        Expr assignee = ParsePostfix();
-
-        if (assignee is CallExpr callExpr)
-        {
-            Expect(TokenType.Semicolon);
-            return new CallStmt(callExpr);
-        }
-
-        if (assignee is NameExpr nameExpr2)
-        {
-            if (Check(TokenType.Function))
-            {
-                FunctionExpr functionExpr = ParseFunction();
-
-                if (functionExpr.IsExpr)
-                    Expect(TokenType.Semicolon);
-
-                VarStmt varStmt = new VarStmt(true, functionExpr, nameExpr2.Name, position);
-
-                return varStmt;
-            }
-            else if (Check(TokenType.Enum))
-            {
-                EnumExpr enumExpr = ParseEnum(nameExpr2.Name);
-
-                VarStmt varStmt = new VarStmt(true, enumExpr, nameExpr2.Name, position);
-
-                return varStmt;
-            }
-        }
-
-        bool isConst = Match(TokenType.Bang);
-
-        Expect(TokenType.Equal);
-
-        if (assignee is NameExpr nameExpr1 && Check(TokenType.Enum))
-        {
-            EnumExpr enumExpr = ParseEnum(nameExpr1.Name);
-            Expect(TokenType.Semicolon);
-            return new VarStmt(isConst, enumExpr, nameExpr1.Name, position);
-        }
-
-        Expr expr = ParseExpr();
-
-        Expect(TokenType.Semicolon);
-
-        if (assignee is NameExpr nameExpr)
-            return new VarStmt(isConst, expr, nameExpr.Name, position);
-        else if (assignee is IndexExpr indexExpr)
-            return new IndexStmt(indexExpr, expr);
-        else if (assignee is MemberExpr memberExpr)
-            return new MemberStmt(memberExpr, expr);
-
-        throw new Error("Invalid assign target", position);
-    }
-
-    IfStmt ParseIf()
-    {
-        Position position = Current().Position;
-
-        Next();
-
-        List<IfBranch> ifBranches = new List<IfBranch>()
-        {
-            new IfBranch(ParseExpr(), ParseBody())
-        };
-
-        List<Stmt>? elseBody = null;
-
-        while (Match(TokenType.Elif))
-        {
-            ifBranches.Add(new IfBranch(ParseExpr(), ParseBody()));
-        }
-
-        if (Match(TokenType.Else))
-            elseBody = ParseBody();
-
-        return new IfStmt(ifBranches, elseBody, position);
-    }
-
-    WhileStmt ParseWhile()
-    {
-        Position position = Current().Position;
-
-        Next();
-
-        IfBranch ifBranch = new IfBranch(ParseExpr(), ParseBody());
-
-        return new WhileStmt(ifBranch, position);
-    }
-
-    BreakStmt ParseBreak()
-    {
-        Position position = Current().Position;
-
-        Next();
-
-        Expect(TokenType.Semicolon);
-
-        return new BreakStmt(position);
-    }
-
-    ContinueStmt ParseContinue()
-    {
-        Position position = Current().Position;
-
-        Next();
-
-        Expect(TokenType.Semicolon);
-
-        return new ContinueStmt(position);
-    }
-
-    ReturnStmt ParseReturn()
-    {
-        Position position = Current().Position;
-
-        Next();
-
-        if (Match(TokenType.Semicolon))
-            return new ReturnStmt(null, position);
-
-        Expr expr = ParseExpr();
-
-        Expect(TokenType.Semicolon);
-
-        return new ReturnStmt(expr, position);
-    }
-
-    List<UseStmt> ParseUse()
-    {
-        UseStmt ParseUse(Position position)
-        {
-            string path = Current().Lexeme;
-
-            Eat("Expected a string path", TokenType.String);
-
-            return new UseStmt(path, position);
-        }
-
-        Position position = Current().Position;
-
-        Next();
-
-        List<UseStmt> useStmts = new List<UseStmt>();
-
-        if (Match(TokenType.LeftParen))
-        {
-            useStmts.Add(ParseUse(position));
-
-            while (Match(TokenType.Comma))
-                useStmts.Add(ParseUse(position));
-
-            Expect(TokenType.RightParen);
-
-            Expect(TokenType.Semicolon);
-
-            return useStmts;
-        }
-
-        else
-        {
-            useStmts.Add(ParseUse(position));
-
-            Expect(TokenType.Semicolon);
-
-            return useStmts;
-        }
-    }
-
-    List<ImportStmt> ParseImport()
-    {
-        ImportStmt ParseImport(Position position)
-        {
-            string path = Current().Lexeme;
-
-            Eat("Expected a string path", TokenType.String);
-
-            return new ImportStmt(path, position);
-        }
-
-        Position position = Current().Position;
-
-        Next();
-
-        List<ImportStmt> importStmts = new List<ImportStmt>();
-
-        if (Match(TokenType.LeftParen))
-        {
-            importStmts.Add(ParseImport(position));
-
-            while (Match(TokenType.Comma))
-                importStmts.Add(ParseImport(position));
-
-            Expect(TokenType.RightParen);
-
-            Expect(TokenType.Semicolon);
-
-            return importStmts;
-        }
-
-        else
-        {
-            importStmts.Add(ParseImport(position));
-
-            Expect(TokenType.Semicolon);
-
-            return importStmts;
-        }
-    }
-
-    ForStmt ParseFor()
-    {
-        Position position = Current().Position;
-
-        Next();
-
-        string iterableName = ParseName();
-
-        Expect(TokenType.In);
-
-        Expr iterable = ParseExpr();
-
-        List<Stmt> body = ParseBody();
-
-        return new ForStmt(iterableName, iterable, body, position);
     }
 
     Error ThrowUnexpected()
@@ -321,17 +48,24 @@ class Parser
         return name;
     }
 
-    List<Stmt> ParseBody()
+    string ParseName(string message)
     {
-        List<Stmt> stmts = new List<Stmt>();
-
-        while (NotAtEnd() && !Check(TokenType.End))
-            stmts.Add(ParseStmt());
-
-        Expect(TokenType.End);
-
-        return stmts;
+        string name = Current().Lexeme;
+        Eat(message, TokenType.Identifier);
+        return name;
     }
+
+    // List<Stmt> ParseBody()
+    // {
+    //     List<Stmt> stmts = new List<Stmt>();
+
+    //     while (NotAtEnd() && !Check(TokenType.End))
+    //         stmts.Add(ParseStmt());
+
+    //     Expect(TokenType.End);
+
+    //     return stmts;
+    // }
 
     List<string> ParseNames(TokenType end)
     {
@@ -392,6 +126,13 @@ class Parser
     bool AtEnd() => Check(TokenType.Eof);
     void Next() => _i++;
 
+    Position PosNext()
+    {
+        Position pos = Current().Position;
+        Next();
+        return pos;
+    }
+
     void Eat(string message, params TokenType[] types)
     {
         if (Check(types))
@@ -429,69 +170,6 @@ class Parser
             throw new Error($"Expected token '{type}'", Current().Position);
     }
 
-    FunctionExpr ParseFunction()
-    {
-        Position position = Current().Position;
-
-        Next();
-
-        List<string> parameters = ParseNames(TokenType.LeftParen, TokenType.RightParen);
-
-        List<Stmt> body = new List<Stmt>();
-
-        bool isExpr = false;
-
-        if (Match(TokenType.Arrow))
-        {
-            Expr expr = ParseExpr();
-
-            ReturnStmt returnStmt = new ReturnStmt(expr, expr.Position);
-
-            body.Add(returnStmt);
-
-            isExpr = true;
-        }
-        else
-            body = ParseBody();
-
-        return new FunctionExpr(body, parameters, isExpr, position);
-    }
-
-    RecordExpr ParseRecord()
-    {
-        Position position = Current().Position;
-
-        Next();
-
-        List<Stmt> body = ParseBody();
-
-        List<VarStmt> varStmts = new List<VarStmt>();
-
-        foreach (Stmt stmt in body)
-        {
-            if (stmt is VarStmt varStmt)
-            {
-                varStmts.Add(varStmt);
-                continue;
-            }
-
-            throw new Error("Only variable statements are allowed in records", position);
-        }
-
-        return new RecordExpr(varStmts, position);
-    }
-
-    EnumExpr ParseEnum(string name)
-    {
-        Position position = Current().Position;
-
-        Next();
-
-        List<string> values = ParseNames(TokenType.End);
-
-        return new EnumExpr(name, values, position);
-    }
-
     Expr ParsePrimary()
     {
         Token token = Current();
@@ -524,73 +202,62 @@ class Parser
             Expect(TokenType.RightParen);
             return expr;
         }
-        else if (Check(TokenType.Function))
-        {
-            return ParseFunction();
-        }
-        else if (Check(TokenType.LeftBracket))
-        {
-            List<Expr> exprs = ParseArgs(TokenType.LeftBracket, TokenType.RightBracket);
-            return new ListExpr(exprs, token.Position);
-        }
-        else if (Check(TokenType.Record))
-            return ParseRecord();
-
+        
         throw ThrowUnexpected();
     }
 
     Expr ParsePostfix()
     {
         Expr left = ParsePrimary();
-        while (Check(TokenType.LeftParen, TokenType.LeftBracket, TokenType.Period))
-        {
-            if (Check(TokenType.LeftParen))
-            {
-                Position position = Current().Position;
+        // while (Check(TokenType.LeftParen, TokenType.LeftBracket, TokenType.Period))
+        // {
+        //     if (Check(TokenType.LeftParen))
+        //     {
+        //         Position position = Current().Position;
 
-                List<Expr> args = ParseArgs(TokenType.LeftParen, TokenType.RightParen);
+        //         List<Expr> args = ParseArgs(TokenType.LeftParen, TokenType.RightParen);
 
-                left = new CallExpr(left, args, position);
+        //         left = new CallExpr(left, args, position);
 
-                continue;
-            }
+        //         continue;
+        //     }
 
-            if (Check(TokenType.LeftBracket))
-            {
-                Position position = Current().Position;
+        //     if (Check(TokenType.LeftBracket))
+        //     {
+        //         Position position = Current().Position;
 
-                Expect(TokenType.LeftBracket);
+        //         Expect(TokenType.LeftBracket);
 
-                Expr index = ParseExpr();
+        //         Expr index = ParseExpr();
 
-                Expect(TokenType.RightBracket);
+        //         Expect(TokenType.RightBracket);
 
-                left = new IndexExpr(left, index, position);
+        //         left = new IndexExpr(left, index, position);
 
-                continue;
-            }
+        //         continue;
+        //     }
 
-            if (Check(TokenType.Period))
-            {
-                Position position = Current().Position;
+        //     if (Check(TokenType.Period))
+        //     {
+        //         Position position = Current().Position;
 
-                Next();
+        //         Next();
 
-                string name = ParseName();
+        //         string name = ParseName();
 
-                left = new MemberExpr(left, name, position);
+        //         left = new MemberExpr(left, name, position);
 
-                continue;
-            }
+        //         continue;
+        //     }
 
-            break;
-        }
+        //     break;
+        // }
         return left;
     }
 
     Expr ParseUnary()
     {
-        if (Check(TokenType.Sub, TokenType.Bang, TokenType.BitwiseNot, TokenType.At))
+        if (Check(TokenType.Sub, TokenType.Bang, TokenType.BitwiseNot, /* TokenType.At */))
         {
             Token op = Current();
 
