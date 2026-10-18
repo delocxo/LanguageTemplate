@@ -257,7 +257,7 @@ class Parser
 
     Expr ParseUnary()
     {
-        if (Check(TokenType.Sub, TokenType.Bang, TokenType.BitwiseNot, /* TokenType.At */))
+        if (Check(TokenType.Sub, TokenType.Bang, TokenType.BitwiseNot /* TokenType.At */))
         {
             Token op = Current();
 
