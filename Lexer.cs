@@ -10,24 +10,6 @@ class Lexer
 
     static Dictionary<string, TokenType> s_keywords = new Dictionary<string, TokenType>()
         {
-            { "true", TokenType.True },
-            { "false", TokenType.False },
-            { "null", TokenType.Null },
-            { "if", TokenType.If },
-            { "else", TokenType.Else },
-            { "end", TokenType.End },
-            { "while", TokenType.While },
-            { "break", TokenType.Break },
-            { "continue", TokenType.Continue },
-            { "func", TokenType.Function },
-            { "return", TokenType.Return },
-            { "use", TokenType.Use },
-            { "record", TokenType.Record },
-            { "enum", TokenType.Enum },
-            { "import", TokenType.Import },
-            { "for", TokenType.For },
-            { "in", TokenType.In },
-            { "elif", TokenType.Elif }
         };
 
     static Dictionary<string, TokenType> s_symbols = new Dictionary<string, TokenType>()
