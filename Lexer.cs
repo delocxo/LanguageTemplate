@@ -10,6 +10,8 @@ class Lexer
 
     static Dictionary<string, TokenType> s_keywords = new Dictionary<string, TokenType>()
         {
+            { "true", TokenType.True },
+            { "false", TokenType.False }
         };
 
     static Dictionary<string, TokenType> s_symbols = new Dictionary<string, TokenType>()
